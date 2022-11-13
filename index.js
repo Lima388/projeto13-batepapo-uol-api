@@ -3,11 +3,15 @@ import cors from "cors";
 import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
+import dayjs from "dayjs";
 
-const userSchema = joi.object({
-  to: joi.string().required().min(3).max(100),
+const messageSchema = joi.object({
+  to: joi.string().required().min(1).max(100),
   text: joi.string().required(),
   type: joi.string().required(),
+});
+const userSchema = joi.object({
+  name: joi.string().required().min(1).max(100),
 });
 
 const app = express();
@@ -23,7 +27,62 @@ let db;
 
 try {
   await mongoClient.connect();
-  db = mongoClient.db("tastecamp");
+  db = mongoClient.db("bate_papo_uol");
 } catch (err) {
   console.log(err);
 }
+
+db.dropDatabase();
+
+db.createCollection("participants");
+db.collection("participants").createIndex({ name: 1 }, { unique: true });
+
+app.post("/participants", async (req, res) => {
+  let user = req.body;
+
+  const validation = userSchema.validate(user, { abortEarly: false });
+
+  if (validation.error) {
+    const errors = validation.error.details.map((detail) => detail.message);
+    res.status(422).send(errors);
+    return;
+  }
+
+  user.lastStatus = Date.now();
+
+  try {
+    await db.collection("participants").insertOne(user);
+    await db.collection("messages").insertOne({
+      from: user.name,
+      to: "Todos",
+      text: "entra na sala...",
+      type: "status",
+      time: dayjs().format("HH:mm:ss"),
+    });
+    res.status(201).send("Participante adicionado com sucesso!");
+  } catch (err) {
+    res.status(409).send(err);
+  }
+});
+
+app.get("/participants", async (req, res) => {
+  try {
+    const participants = await db.collection("participants").find().toArray();
+    res.send(participants);
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+app.get("/messages", async (req, res) => {
+  try {
+    const messages = await db.collection("messages").find().toArray();
+    res.send(messages);
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+app.listen(5000, () => console.log("Server running in port 5000"));
