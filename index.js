@@ -32,9 +32,6 @@ try {
   console.log(err);
 }
 
-db.dropDatabase();
-
-db.createCollection("participants");
 db.collection("participants").createIndex({ name: 1 }, { unique: true });
 
 app.post("/participants", async (req, res) => {
@@ -108,8 +105,23 @@ app.get("/participants", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
+  const limit = parseInt(req.query.limit);
+  const user = req.header("User");
   try {
-    const messages = await db.collection("messages").find().toArray();
+    let messages = await db.collection("messages").find().toArray();
+    messages = messages.filter((message) => {
+      switch (message.to) {
+        case "Todos":
+          return true;
+        case user:
+          return true;
+        default:
+          return false;
+      }
+    });
+    if (limit > 0) {
+      messages = messages.slice(-limit);
+    }
     res.send(messages);
   } catch (err) {
     console.error(err);
