@@ -110,6 +110,12 @@ app.get("/messages", async (req, res) => {
   try {
     let messages = await db.collection("messages").find().toArray();
     messages = messages.filter((message) => {
+      if (message.type === "message") {
+        return true;
+      }
+      if (message.from === user) {
+        return true;
+      }
       switch (message.to) {
         case "Todos":
           return true;
