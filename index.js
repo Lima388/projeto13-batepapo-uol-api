@@ -6,12 +6,12 @@ import joi from "joi";
 import dayjs from "dayjs";
 
 const messageSchema = joi.object({
-  to: joi.string().required().min(1).max(100),
+  to: joi.string().required(),
   text: joi.string().required(),
-  type: joi.string().required(),
+  type: joi.string().valid("message", "private_message").required(),
 });
 const userSchema = joi.object({
-  name: joi.string().required().min(1).max(100),
+  name: joi.string().required(),
 });
 
 const app = express();
@@ -62,6 +62,38 @@ app.post("/participants", async (req, res) => {
     res.status(201).send("Participante adicionado com sucesso!");
   } catch (err) {
     res.status(409).send(err);
+  }
+});
+
+app.post("/messages", async (req, res) => {
+  let message = req.body;
+
+  const validation = messageSchema.validate(message, { abortEarly: false });
+
+  if (validation.error) {
+    const errors = validation.error.details.map((detail) => detail.message);
+    res.status(422).send(errors);
+    return;
+  }
+
+  message.from = req.header("User");
+  message.time = dayjs().format("HH:mm:ss");
+
+  try {
+    const userSignedIn =
+      (await db
+        .collection("participants")
+        .find({ name: message.from })
+        .count()) > 0;
+    if (!userSignedIn) {
+      throw new Exception();
+    }
+
+    await db.collection("messages").insertOne(message);
+
+    res.sendStatus(201);
+  } catch (err) {
+    res.status(422).send(err);
   }
 });
 
